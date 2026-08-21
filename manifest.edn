@@ -1,0 +1,100 @@
+;; openicc — actor manifest.
+;;
+;; The gate list here is a DESCRIPTION. The implementation is
+;; `openicc.governor/gates` plus `openicc.governor/checks`, and
+;; `openicc.governor/declared-but-unevaluated` fails if the two drift — a
+;; charter gate with no predicate is decorative, and worse than an absent one.
+{:actor/id "openicc"
+ :actor/glyph "国際刑事"
+ :actor/display-name "openicc — Autonomous Rome Statute procedure bots"
+ :actor/did "did:web:openicc.etzhayyim.com"
+ :actor/tier :tier-b
+ :actor/status :r0
+ :actor/adr ["adr-2608220100-openicc-autonomous-icc-procedure-bots"]
+
+ :actor/purpose
+ "An open, autonomous, decentralised implementation of the International
+  Criminal Court's own analytical procedure under the Rome Statute. Nine bots
+  mirroring the Court's four organs plus the defence: preliminary examination
+  (Art. 15(2)), elements of crimes (Art. 6/7/8/8bis), jurisdiction (Art. 11-13),
+  admissibility and complementarity (Art. 17), interests of justice
+  (Art. 53(1)(c)), adversarial rebuttal (Art. 67), Article 15(2) communication
+  drafting, registry custody (Art. 43), and the quorum that alone may publish a
+  named finding (Art. 112). Chartered by the owner on 2026-08-21 to assess and
+  to name, which is the OPPOSITE of danjo's non-adjudicating charter, and is why
+  publication is a consensus act rather than a bot's decision."
+
+ :actor/bots
+ [{:bot "examiner"      :organ "Office of the Prosecutor" :article "15(2)"
+   :io "open sources -> content-addressed assertions; the only stage that touches the outside world"}
+  {:bot "elements"      :organ "Office of the Prosecutor" :article "6/7/8/8bis"
+   :io "facts -> chapeau (contextual element) assessment; underlying acts alone never suffice"}
+  {:bot "jurisdiction"  :organ "Chambers" :article "11/12/13"
+   :io "a pure decision core; no model is consulted, so no model can be wrong about it"}
+  {:bot "admissibility" :organ "Chambers" :article "17"
+   :io "complementarity + gravity; the ONLY place openicc rates anything"}
+  {:bot "interests"     :organ "Office of the Prosecutor" :article "53(1)(c)"
+   :io "the negatively-framed limb; default is proceed"}
+  {:bot "defence"       :organ "Defence" :article "67"
+   :io "tries to break the dossier; defaults to REFUTED on a thin record"}
+  {:bot "communication" :organ "-" :article "15(2)"
+   :io "drafts the submission to the Prosecutor; the only outbound artefact"}
+  {:bot "registry"      :organ "Registry" :article "43"
+   :io "blocks / append-only ledger / periodic public-L1 anchor"}
+  {:bot "assembly"      :organ "Assembly of States Parties" :article "112"
+   :io "the 2f+1 quorum; never evaluates evidence"}]
+
+ :actor/gates
+ [{:gate "G1"  :rule "closed Article 5(1) crime set"}
+  {:gate "G2"  :rule "verified-registry-only citation; :unverified-seed is readable, not publishable"}
+  {:gate "G3"  :rule "non-fabrication; zero assertions is :no-evidence, never a pass"}
+  {:gate "G4"  :rule "a named natural person needs 2+ INDEPENDENT publishers and 1+ content-pinned source"}
+  {:gate "G5"  :rule "complete pipeline; a missing limb is not a neutral limb"}
+  {:gate "G6"  :rule "the defence bot must have run and failed; not-run is a refusal"}
+  {:gate "G7"  :rule "a named finding requires a 2f+1 quorum certificate over its content address"}
+  {:gate "G8"  :rule "Article 15(2) channel only - never press, party, or public list"}
+  {:gate "G9"  :rule "rating only in Article 17 limbs; no index, ranking or league table"}
+  {:gate "G10" :rule "temporal floor is the LATER of 2002-07-01 and the State's entry into force"}
+  {:gate "G11" :rule "lawful collection only; no intrusion, compromised material or access-control bypass"}
+  {:gate "G12" :rule "append-only lineage; a refusal is a record, not a silence"}
+  {:gate "G13" :rule "Article 66 presumption of innocence; state allegation and source, never guilt"}
+  {:gate "G14" :rule "murakumo-main inference only, checked PER FINDING"}]
+
+ :actor/non-goals
+ {"N1" "NOT a court; states no finding of guilt (Art. 66 / G13)"
+  "N2" "NOT a ranking, index or league table of States (G9)"
+  "N3" "NOT victim support and NOT legal advice"
+  "N4" "NOT a publisher; has no outbound channel other than the Prosecutor (G8)"
+  "N5" "NOT a handler of non-public or compromised material (G11)"
+  "N6" "NOT an organ of the ICC and does not present itself as one"
+  "N7" "NOT in contact with witnesses or victims; it operates no protection mechanism"
+  "N8" "the assembly bot does NOT evaluate evidence; it answers quorum only"}
+
+ :actor/planes
+ {:blocks {:provider :ipfs :fallback :b2 :role "the records themselves, addressed by content"}
+  :refs   {:provider :inga :quorum :head-count
+           :role "which record is current; the 2f+1 certificate IS the conditional write"
+           :note "head counting is correct only for a MANAGED validator set; open the admission and this must become :stake-weighted"}
+  :anchor {:chain :ethereum :every-n 32 :publish-content? false
+           :role "a public commitment that a head existed; NEVER the allegation text"}}
+
+ :actor/inference {:endpoint-alias "murakumo-main"
+                   :note "the alias is the SSoT; a concrete model id here would be stale within weeks"}
+
+ :actor/lexicons
+ ["com.etzhayyim.openicc.informationItem"
+  "com.etzhayyim.openicc.elementFinding"
+  "com.etzhayyim.openicc.jurisdictionFinding"
+  "com.etzhayyim.openicc.admissibilityAssessment"
+  "com.etzhayyim.openicc.interestsFinding"
+  "com.etzhayyim.openicc.rebuttal"
+  "com.etzhayyim.openicc.article15Communication"
+  "com.etzhayyim.openicc.quorumCertificate"
+  "com.etzhayyim.openicc.ledgerEntry"]
+
+ :actor/measured
+ {:date "2026-08-22"
+  :note "counts here are a landing-time measurement, not a ceiling. Re-measure rather than cite."
+  :live? false
+  :dispatched-ever 0
+  :registry-entries-verified 0}}

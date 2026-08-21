@@ -1,0 +1,598 @@
+(ns openicc.core-test
+  "The suite is organised around one question per test: **can this check fail?**
+
+  A gate that has only ever been seen green is not evidence. So every governor
+  gate below is exercised in both directions — a dossier that passes it, and the
+  same dossier with exactly one thing broken — and the assertion names the gate
+  that must fire. Breaking two things and watching something go red proves
+  nothing about which check was doing the work."
+  (:require [clojure.string :as str]
+            [clojure.test :refer [deftest is testing]]
+            [openicc.bot.admissibility :as admissibility]
+            [openicc.bot.assembly :as assembly]
+            [openicc.bot.communication :as communication]
+            [openicc.bot.defence :as defence]
+            [openicc.bot.elements :as elements]
+            [openicc.bot.examiner :as examiner]
+            [openicc.bot.interests :as interests]
+            [openicc.bot.jurisdiction :as jurisdiction]
+            [openicc.bot.registry :as registry]
+            [openicc.chain :as chain]
+            [openicc.core :as core]
+            [openicc.governor :as gov]
+            [openicc.record :as rec]
+            [openicc.statute :as statute]
+            [openicc.tick :as tick]))
+
+;; ---------------------------------------------------------------------------
+;; Injected world
+;; ---------------------------------------------------------------------------
+
+(defn hash-fn
+  "A deterministic, portable digest. Not cryptographic and not pretending to be
+  — the library takes `hash-fn` injected precisely so a test can use something
+  fast while a deployment uses SHA-256."
+  [s]
+  (str "t" (Math/abs (hash s))))
+
+(def at "2026-08-22T00:00:00Z")
+
+(defn src [pub & [cid]]
+  (rec/source {:url (str "https://example.test/" pub) :publisher pub
+               :title (str pub " report") :cid cid :retrieved-at at}))
+
+;; ---------------------------------------------------------------------------
+;; A dossier that passes every gate, and the knobs to break it one at a time
+;; ---------------------------------------------------------------------------
+
+(defn verified-registry
+  "Gate G2 refuses unverified citations, and everything in openicc.statute ships
+  as :unverified-seed. Rather than mutate the registry, tests that need to get
+  past G2 redefine the resolver — which also proves G2 is reading the registry
+  and not a hardcoded allow-list."
+  [articles f]
+  (with-redefs [statute/unverified-citations
+                (fn [cites] (vec (remove (set articles) cites)))]
+    (f)))
+
+(defn good-assertions []
+  [(rec/assertion {:claim "forces attacked the town of X on 2019-04-02"
+                   :sources [(src "reuters" "bafy1") (src "amnesty")]
+                   :cites ["7(1)"] :subject-kind :state})
+   (rec/assertion {:claim "commander N ordered the attack"
+                   :sources [(src "hrw" "bafy2") (src "bbc")]
+                   :cites ["7(1)"] :subject-kind :individual})])
+
+(defn good-dossier []
+  (let [as (good-assertions)]
+    {:dossier/situation-id :test-situation
+     :dossier/crime :crimes-against-humanity
+     :dossier/findings
+     {:elements      {:finding/verdict :affirmative :finding/crime :crimes-against-humanity
+                      :finding/cites ["7"] :finding/assertions as :finding/unaddressed []
+                      :finding/rationale "contextual elements established"
+                      :inference/endpoint "murakumo-main"}
+      :jurisdiction  {:finding/verdict :affirmative :finding/cites ["11" "13(a)"]
+                      :finding/assertions [] :finding/rationale "territorial limb satisfied"
+                      :inference/endpoint "murakumo-main"}
+      :admissibility {:finding/verdict :affirmative :finding/cites ["17(1)(a)" "17(2)(a)"]
+                      :finding/assertions [] :finding/ranking? false
+                      :finding/rationale "shielding indicium cited"
+                      :inference/endpoint "murakumo-main"}
+      :interests     {:finding/verdict :affirmative :finding/cites ["53(1)(c)"]
+                      :finding/assertions [] :finding/rationale "no reason to stand down"
+                      :inference/endpoint "murakumo-main"}}
+     :dossier/rebuttal {:ran? true :refuted? false :grounds [] :scanned 2}
+     :dossier/quorum {:cert {:cert/dossier-cid "cid" :cert/signers ["a" "b" "c"]}
+                      :quorum-met? true :signers ["a" "b" "c"]}
+     :dossier/conduct-window {:from "2019-04-02" :state-entry-into-force "2003-01-01"}
+     :dossier/lineage ["bafy1" "bafy2"]
+     :dossier/at at}))
+
+(def ^:private all-cites
+  ["7" "7(1)" "11" "13(a)" "17(1)(a)" "17(2)(a)" "53(1)(c)"])
+
+(defn admit-good [dossier]
+  (verified-registry all-cites #(gov/admit dossier at)))
+
+(defn refused-gates [dossier]
+  (into #{} (map :gate/id) (:refusals (admit-good dossier))))
+
+;; ---------------------------------------------------------------------------
+;; The governor, in both directions
+;; ---------------------------------------------------------------------------
+
+(deftest baseline-dossier-is-admitted
+  (testing "the fixture must pass, or every negative test below proves nothing"
+    (let [r (admit-good (good-dossier))]
+      (is (:admitted? r) (gov/explain r))
+      (is (= 14 (count (:evaluated r))) "every declared gate was evaluated"))))
+
+(deftest every-declared-gate-is-evaluated
+  (testing "a charter gate with no predicate is decorative, and worse than absent"
+    (is (empty? (gov/declared-but-unevaluated)))))
+
+(deftest g1-refuses-a-crime-outside-article-5
+  (is (= #{:G1} (refused-gates (assoc-in (good-dossier)
+                                         [:dossier/findings :elements :finding/crime]
+                                         :ecocide)))))
+
+(deftest g2-refuses-an-unverified-citation
+  (testing "the registry ships unverified, so the unredefined resolver must refuse"
+    (let [r (gov/admit (good-dossier) at)]
+      (is (not (:admitted? r)))
+      (is (contains? (into #{} (map :gate/id) (:refusals r)) :G2)))))
+
+(deftest g3-and-g4-distinguish-unsourced-from-thinly-sourced
+  (testing "one publisher is not corroboration, even when there are two sources"
+    (let [d (assoc-in (good-dossier)
+                      [:dossier/findings :elements :finding/assertions]
+                      [(rec/assertion {:claim "commander N ordered the attack"
+                                       :sources [(src "wire" "bafy9") (src "wire")]
+                                       :cites ["7(1)"] :subject-kind :individual})])]
+      (is (contains? (refused-gates d) :G4))))
+  (testing "an empty dossier is :no-evidence, never a pass"
+    (let [d (-> (good-dossier)
+                (assoc-in [:dossier/findings :elements :finding/assertions] []))
+          r (admit-good d)
+          reasons (into {} (map (juxt :gate/id :refusal/reason)) (:refusals r))]
+      (is (= :no-evidence (:G3 reasons))
+          "zero assertions must be reported as no-evidence, not silently passed"))))
+
+(deftest g5-refuses-a-missing-limb-and-a-non-affirmative-one
+  (is (contains? (refused-gates (update (good-dossier) :dossier/findings dissoc :interests)) :G5))
+  (is (contains? (refused-gates (assoc-in (good-dossier)
+                                          [:dossier/findings :interests :finding/verdict]
+                                          :indeterminate))
+                 :G5)))
+
+(deftest g6-treats-a-defence-that-did-not-run-as-a-refusal
+  (let [r (admit-good (assoc (good-dossier) :dossier/rebuttal (defence/not-run)))
+        reasons (into {} (map (juxt :gate/id :refusal/reason)) (:refusals r))]
+    (is (= :rebuttal-not-run (:G6 reasons))
+        "not-run must not read the same as ran-and-found-nothing")))
+
+(deftest g7-blocks-a-named-finding-without-a-quorum
+  (testing "no single node may publish a name"
+    (is (contains? (refused-gates (dissoc (good-dossier) :dossier/quorum)) :G7)))
+  (testing "but a dossier that names nobody needs no quorum"
+    (let [anon (rec/assertion {:claim "an attack occurred at X"
+                               :sources [(src "reuters" "bafy1") (src "amnesty")]
+                               :cites ["7(1)"] :subject-kind :state})
+          d (-> (good-dossier)
+                (dissoc :dossier/quorum)
+                (assoc-in [:dossier/findings :elements :finding/assertions] [anon]))]
+      (is (not (contains? (refused-gates d) :G7))))))
+
+(deftest g8-permits-only-the-article-15-channel
+  (is (contains? (refused-gates (assoc (good-dossier) :dossier/dispatch
+                                       {:dispatch/channel :press-release}))
+                 :G8))
+  (is (not (contains? (refused-gates (assoc (good-dossier) :dossier/dispatch
+                                            {:dispatch/channel :article-15-2-otp}))
+                      :G8))))
+
+(deftest g9-refuses-a-league-table
+  (testing "an Article 17 assessment is about the Court's competence, not a ranking of States"
+    (is (contains? (refused-gates (assoc-in (good-dossier)
+                                            [:dossier/findings :admissibility :finding/ranking?]
+                                            true))
+                   :G9)))
+  (testing "and refuses a rating that cites no Article 17 limb"
+    (is (contains? (refused-gates (assoc-in (good-dossier)
+                                            [:dossier/findings :admissibility :finding/cites]
+                                            ["53(1)(c)"]))
+                   :G9))))
+
+(deftest g10-applies-the-later-of-the-two-temporal-floors
+  (testing "conduct before the State's own entry into force is out of reach"
+    (is (contains? (refused-gates (assoc (good-dossier) :dossier/conduct-window
+                                         {:from "2002-08-01" :state-entry-into-force "2003-01-01"}))
+                   :G10))))
+
+(deftest g11-refuses-unlawfully-collected-sources
+  (let [d (assoc-in (good-dossier) [:dossier/findings :elements :finding/assertions]
+                    [(rec/assertion {:claim "leaked internal order"
+                                     :sources [(rec/source {:url "https://x.test/leak"
+                                                            :publisher "p" :cid "c"
+                                                            :kind :intrusion})
+                                               (src "other" "c2")]
+                                     :cites ["7(1)"] :subject-kind :individual})])]
+    (is (contains? (refused-gates d) :G11))))
+
+(deftest g12-requires-lineage
+  (is (contains? (refused-gates (assoc (good-dossier) :dossier/lineage [])) :G12)))
+
+(deftest g13-refuses-language-that-pronounces-guilt
+  (let [d (assoc-in (good-dossier) [:dossier/findings :elements :finding/rationale]
+                    "The evidence shows commander N is guilty of crimes against humanity.")]
+    (is (contains? (refused-gates d) :G13))))
+
+(deftest g14-refuses-inference-off-the-murakumo-alias
+  (is (contains? (refused-gates (assoc-in (good-dossier)
+                                          [:dossier/findings :elements :inference/endpoint]
+                                          "gpt-somewhere"))
+                 :G14))
+  (testing "a finding that does not say which model produced it is refused, not assumed fine"
+    (is (contains? (refused-gates (update-in (good-dossier) [:dossier/findings :elements]
+                                             dissoc :inference/endpoint))
+                   :G14))))
+
+;; ---------------------------------------------------------------------------
+;; Jurisdiction — the three traps
+;; ---------------------------------------------------------------------------
+
+(deftest security-council-referral-does-not-need-article-12-2
+  (let [f (jurisdiction/assess {:situation-id :s :crime :war-crimes
+                                :trigger :security-council-referral
+                                :conduct-from "2011-03-01"
+                                :territory-state-party? false
+                                :accused-nationality-state-party? false}
+                               {:at at})]
+    (is (= :affirmative (:finding/verdict f))
+        "applying 12(2) to a 13(b) referral reports no jurisdiction over exactly the situations 13(b) exists to reach"))
+  (testing "the same facts under a State referral do NOT reach"
+    (is (= :negative (:finding/verdict
+                      (jurisdiction/assess {:situation-id :s :crime :war-crimes
+                                            :trigger :state-referral
+                                            :conduct-from "2011-03-01"
+                                            :territory-state-party? false
+                                            :accused-nationality-state-party? false}
+                                           {:at at}))))))
+
+(deftest the-temporal-floor-is-per-state
+  (is (= "2015-01-01" (jurisdiction/temporal-floor {:state-entry-into-force "2015-01-01"})))
+  (is (= "2002-07-01" (jurisdiction/temporal-floor {:state-entry-into-force "1999-01-01"})))
+  (testing "an Article 12(3) declaration may reach back before accession"
+    (is (= "2014-02-01" (jurisdiction/temporal-floor {:state-entry-into-force "2015-01-01"
+                                                      :art-12-3-declaration-from "2014-02-01"}))))
+  (testing "an unknown conduct date is indeterminate, not in-range"
+    (is (= :indeterminate (jurisdiction/within-temporal? {})))))
+
+(deftest aggression-is-not-symmetric-with-the-other-crimes
+  (let [base {:situation-id :s :crime :aggression :conduct-from "2019-01-01"
+              :territory-state-party? true}]
+    (is (= :negative (:finding/verdict
+                      (jurisdiction/assess (assoc base :trigger :state-referral) {:at at})))
+        "Kampala not ratified: unreachable under 15bis")
+    (is (= :affirmative (:finding/verdict
+                         (jurisdiction/assess (assoc base :trigger :state-referral
+                                                     :kampala-ratified-by-territory-state? true)
+                                              {:at at}))))
+    (is (= :affirmative (:finding/verdict
+                         (jurisdiction/assess (assoc base :trigger :security-council-referral)
+                                              {:at at})))
+        "15ter is not limited the same way")))
+
+;; ---------------------------------------------------------------------------
+;; Admissibility — polarity, closed lists, and the honest default
+;; ---------------------------------------------------------------------------
+
+(deftest a-state-genuinely-acting-closes-the-door
+  (is (= :negative (:finding/verdict
+                    (admissibility/assess {:situation-id :s :national-proceedings? true
+                                           :gravity-factors {:scale :high :nature :high}}
+                                          {:at at}))))
+  (testing "an enumerated Article 17(2) indicium reopens it"
+    (is (= :affirmative (:finding/verdict
+                         (admissibility/assess {:situation-id :s :national-proceedings? true
+                                                :unwillingness-indicia [:shielding]
+                                                :gravity-factors {:scale :high :nature :high}}
+                                               {:at at}))))))
+
+(deftest unseen-national-proceedings-are-indeterminate-not-affirmative
+  (let [f (admissibility/assess {:situation-id :s
+                                 :gravity-factors {:scale :high :nature :high}}
+                                {:at at})]
+    (is (= :indeterminate (:finding/verdict f))
+        "a State we could not observe must not score the same as one that is stonewalling")))
+
+(deftest indicia-outside-the-closed-list-are-reported-not-absorbed
+  (let [f (admissibility/assess {:situation-id :s :national-proceedings? true
+                                 :unwillingness-indicia [:shielding :seems-political]
+                                 :gravity-factors {:scale :high :nature :high}}
+                                {:at at})]
+    (is (= [:seems-political] (:finding/ignored-indicia f)))
+    (is (str/includes? (:finding/rationale f) "OUTSIDE"))))
+
+(deftest gravity-from-unmeasured-factors-is-indeterminate
+  (is (= :indeterminate (admissibility/gravity-sufficient? {:scale :high})))
+  (is (= :indeterminate (admissibility/gravity-sufficient? {})))
+  (is (true? (admissibility/gravity-sufficient? {:scale :high :nature :low})))
+  (is (false? (admissibility/gravity-sufficient? {:scale :low :nature :low}))))
+
+;; ---------------------------------------------------------------------------
+;; Elements — unaddressed is its own state
+;; ---------------------------------------------------------------------------
+
+(deftest an-unaddressed-chapeau-element-is-not-a-failed-one
+  (let [unaddressed (elements/assess {:situation-id :s :crime :crimes-against-humanity
+                                      :underlying-acts [:killing]
+                                      :addressed {:attack-on-civilians true}}
+                                     {:at at})
+        failed (elements/assess {:situation-id :s :crime :crimes-against-humanity
+                                 :underlying-acts [:killing]
+                                 :addressed {:attack-on-civilians true
+                                             :widespread-or-systematic false
+                                             :state-or-org-policy true
+                                             :knowledge-of-attack true}}
+                                {:at at})]
+    (is (= :indeterminate (:finding/verdict unaddressed)))
+    (is (seq (:finding/unaddressed unaddressed)))
+    (is (= :negative (:finding/verdict failed))
+        "explicitly not established is a different answer from never addressed")))
+
+(deftest underlying-acts-alone-never-establish-a-crime
+  (is (= :indeterminate (:finding/verdict
+                         (elements/assess {:situation-id :s :crime :genocide
+                                           :underlying-acts [] :addressed {}}
+                                          {:at at})))))
+
+(deftest elements-refuses-a-crime-outside-article-5
+  (is (thrown? #?(:clj Exception :cljs js/Error)
+               (elements/assess {:situation-id :s :crime :ecocide
+                                 :underlying-acts [:x] :addressed {}}
+                                {:at at}))))
+
+;; ---------------------------------------------------------------------------
+;; Interests — the inverted limb
+;; ---------------------------------------------------------------------------
+
+(deftest article-53-1-c-defaults-to-proceed
+  (let [f (interests/assess {:situation-id :s :substantial-reasons []} {:at at})]
+    (is (= :affirmative (:finding/verdict f)))
+    (is (str/includes? (:finding/rationale f) "NO substantial reason")
+        "the rationale must say what affirmative means here, or a reader downstream will take it for an endorsement")))
+
+;; ---------------------------------------------------------------------------
+;; Defence — the default matters more than the logic
+;; ---------------------------------------------------------------------------
+
+(deftest the-defence-bot-refutes-a-thin-record-by-default
+  (let [r (defence/refute {:dossier/findings {}} {})]
+    (is (:ran? r))
+    (is (:refuted? r))
+    (is (= [:insufficient-record] (:grounds r))
+        "abstaining on thin evidence is a rubber stamp; thin evidence is when the other bots are most likely wrong")))
+
+(deftest the-defence-bot-names-a-closed-set-of-grounds
+  (let [d (assoc (good-dossier) :dossier/rebuttal nil)
+        r (defence/refute (assoc-in d [:dossier/findings :admissibility :finding/verdict]
+                                    :indeterminate)
+                          {:attribution-established? true})]
+    (is (:refuted? r))
+    (is (every? defence/ground-ids (:grounds r)))
+    (is (contains? (set (:grounds r)) :complementarity-unmeasured))))
+
+;; ---------------------------------------------------------------------------
+;; Record — corroboration counts publishers, not reprints
+;; ---------------------------------------------------------------------------
+
+(deftest independent-sources-counts-publishers-not-reprints
+  (is (= 1 (rec/independent-sources [(src "wire") (src "wire") (src "WIRE")])))
+  (is (= 2 (rec/independent-sources [(src "reuters") (src "afp")])))
+  (testing "sources with no publisher each count as their own — guessing toward publishable is the wrong direction"
+    (is (= 2 (rec/independent-sources [(rec/source {:url "a"}) (rec/source {:url "b"})])))))
+
+(deftest an-assertion-without-a-source-cannot-be-constructed
+  (is (thrown? #?(:clj Exception :cljs js/Error)
+               (rec/assertion {:claim "x" :sources []}))))
+
+(deftest content-addresses-are-stable-across-map-construction-order
+  (let [a (rec/content-id hash-fn (into {} [[:a 1] [:b 2] [:c 3]]))
+        b (rec/content-id hash-fn (into {} [[:c 3] [:b 2] [:a 1]]))]
+    (is (= a b)))
+  (testing "and hash-fn is required rather than defaulted"
+    (is (thrown? #?(:clj Exception :cljs js/Error) (rec/content-id nil {})))))
+
+;; ---------------------------------------------------------------------------
+;; Registry — a ledger, and what an empty one means
+;; ---------------------------------------------------------------------------
+
+(deftest the-ledger-chains-and-detects-a-break
+  (let [l1 (registry/append hash-fn [] (registry/entry {:kind :commit :subject-cid "a" :at at}))
+        l2 (registry/append hash-fn l1 (registry/entry {:kind :hold :subject-cid "b" :at at}))]
+    (is (:ok? (registry/intact? hash-fn l2)))
+    (is (= 2 (:checked (registry/intact? hash-fn l2))))
+    (testing "a tampered entry is caught"
+      (let [bad (assoc-in l2 [1 :ledger/decision] :admitted)]
+        (is (not (:ok? (registry/intact? hash-fn bad))))
+        (is (= 1 (:broken-at (registry/intact? hash-fn bad))))))))
+
+(deftest an-empty-ledger-is-not-an-intact-one
+  (let [r (registry/intact? hash-fn [])]
+    (is (not (:ok? r)))
+    (is (= 0 (:checked r)))
+    (is (some? (:note r)) "checked-zero must be distinguishable from verified-intact")))
+
+(deftest a-hold-is-a-ledger-entry
+  (let [e (registry/entry {:kind :hold :decision :refused
+                           :refusals [{:gate/id :G7 :refusal/reason :no-quorum-certificate}]
+                           :at at})]
+    (is (= :hold (:ledger/kind e)))
+    (is (seq (:ledger/refusals e))
+        "a refusal that leaves no record is indistinguishable from never having run")))
+
+(deftest anchoring-is-periodic-not-per-commit
+  (is (not (registry/should-anchor? {:ledger-length 3 :every-n 32})))
+  (is (registry/should-anchor? {:ledger-length 40 :every-n 32}))
+  (is (registry/should-anchor? {:ledger-length 40 :last-anchored-length 33 :every-n 7})))
+
+;; ---------------------------------------------------------------------------
+;; Assembly — the quorum, and divergence
+;; ---------------------------------------------------------------------------
+
+(deftest the-tally-reports-divergent-dossiers-rather-than-filtering-them
+  (let [t (assembly/tally "cid-a"
+                          [(assembly/ballot {:signer "n1" :dossier-cid "cid-a" :admitted? true})
+                           (assembly/ballot {:signer "n2" :dossier-cid "cid-a" :admitted? true})
+                           (assembly/ballot {:signer "n3" :dossier-cid "cid-b" :admitted? true})])]
+    (is (= 2 (:yes t)))
+    (is (= 1 (:off-cid t)))
+    (is (= #{"cid-b"} (:divergent t))
+        "two nodes building different dossiers from the same inputs is a finding about the system")))
+
+(deftest certification-requires-an-injected-quorum-predicate
+  (is (thrown? #?(:clj Exception :cljs js/Error)
+               (assembly/certify {:dossier-cid "c" :ballots [] :at at}))))
+
+(deftest a-certificate-exists-only-when-the-quorum-is-met
+  (let [ballots (mapv #(assembly/ballot {:signer % :dossier-cid "c" :admitted? true}) ["a" "b"])
+        met     (assembly/certify {:dossier-cid "c" :ballots ballots
+                                   :quorum-met? #(>= (count %) 2) :node-count 3 :at at})
+        unmet   (assembly/certify {:dossier-cid "c" :ballots ballots
+                                   :quorum-met? #(>= (count %) 3) :node-count 4 :at at})]
+    (is (:quorum-met? met))
+    (is (some? (:cert met)))
+    (is (not (:quorum-met? unmet)))
+    (is (nil? (:cert unmet)) "no quorum, no certificate — not a certificate marked false")))
+
+(deftest byzantine-threshold-is-2f-plus-1
+  (is (= {:n 4 :f 1 :threshold 3} (assembly/byzantine-threshold 4)))
+  (is (= {:n 7 :f 2 :threshold 5} (assembly/byzantine-threshold 7)))
+  (is (= {:n 1 :f 0 :threshold 1} (assembly/byzantine-threshold 1))))
+
+;; ---------------------------------------------------------------------------
+;; Chain — the deletion test, applied to a config
+;; ---------------------------------------------------------------------------
+
+(deftest the-default-configuration-validates
+  (is (:ok? (chain/validate chain/default-config))))
+
+(deftest a-single-vendor-ref-plane-is-refused
+  (let [r (chain/validate (assoc-in chain/default-config [:refs :provider] :d1))]
+    (is (not (:ok? r)))
+    (is (= #{:single-vendor-premise} (into #{} (map :problem) (:problems r))))))
+
+(deftest publishing-allegation-text-to-a-public-chain-is-refused
+  (let [r (chain/validate (assoc-in chain/default-config [:anchor :publish-content?] true))]
+    (is (not (:ok? r)))
+    (is (contains? (into #{} (map :problem) (:problems r)) :content-on-public-chain))))
+
+(deftest a-missing-ref-plane-is-refused-because-g7-could-never-pass
+  (is (not (:ok? (chain/validate (dissoc chain/default-config :refs))))))
+
+;; ---------------------------------------------------------------------------
+;; Tick — bounded, leased, and loud about doing nothing
+;; ---------------------------------------------------------------------------
+
+(deftest a-tick-without-the-lease-does-nothing-and-says-why
+  (let [r (tick/run-tick {:phase :rebuttal :dossier (good-dossier) :ledger []
+                          :lease {:owner "other" :expires-at "2099-01-01T00:00:00Z"}}
+                         {:node-id "me" :now at :hash-fn hash-fn})]
+    (is (nil? (:did r)))
+    (is (= :lease-not-held (get-in r [:halt-reason :halt]))
+        "a tick that returns did=nil with no reason is indistinguishable from one that worked")))
+
+(deftest an-expired-lease-is-not-held-even-by-its-owner
+  (is (not (tick/lease-held? {:owner "me" :expires-at "2020-01-01T00:00:00Z"} "me" at)))
+  (is (tick/lease-held? {:owner "me" :expires-at "2099-01-01T00:00:00Z"} "me" at)))
+
+(deftest an-exhausted-budget-halts-the-tick
+  (let [r (tick/run-tick {:phase :rebuttal :dossier (good-dossier) :ledger []
+                          :lease {:owner "me" :expires-at "2099-01-01T00:00:00Z"}
+                          :budget {:spent 100 :limit 100}}
+                         {:node-id "me" :now at :hash-fn hash-fn})]
+    (is (= :budget-exhausted (get-in r [:halt-reason :halt])))))
+
+(deftest a-refused-dossier-writes-a-hold-and-does-not-advance
+  (let [d (assoc (good-dossier) :dossier/rebuttal (defence/not-run))
+        r (tick/run-tick {:phase :certify :dossier d :ledger [] :ballots []
+                          :lease {:owner "me" :expires-at "2099-01-01T00:00:00Z"}}
+                         {:node-id "me" :now at :hash-fn hash-fn
+                          :quorum-met? (constantly true) :node-count 3})]
+    (is (= :governor-refused (get-in r [:halt-reason :halt])))
+    (is (= :certify (:phase r)) "the phase must not advance past a refusal")
+    (is (= :hold (:ledger/kind (peek (:ledger r)))))))
+
+(deftest dispatch-cannot-run-past-the-governor
+  (let [sent (atom 0)
+        d (assoc (good-dossier) :dossier/rebuttal (defence/not-run))
+        r (tick/run-tick {:phase :dispatch :dossier d :ledger []
+                          :lease {:owner "me" :expires-at "2099-01-01T00:00:00Z"}}
+                         {:node-id "me" :now at :hash-fn hash-fn
+                          :dispatch-fn (fn [_] (swap! sent inc) :sent)})]
+    (is (zero? @sent) "the single invariant: nothing the governor refuses is ever sent")
+    (is (= :governor-refused (get-in r [:halt-reason :halt])))))
+
+(deftest phases-advance-in-order-and-end
+  (is (= :elements (tick/next-phase :intake)))
+  (is (nil? (tick/next-phase :anchor))))
+
+;; ---------------------------------------------------------------------------
+;; Examiner — loud refusals
+;; ---------------------------------------------------------------------------
+
+(deftest intake-reports-what-it-rejected-and-why
+  (let [r (examiner/intake
+           [{:claim "a" :sources [(src "p1" "c1")] :subject-kind :state}
+            {:claim "" :sources [(src "p2")]}
+            {:claim "c" :sources []}
+            {:claim "d" :sources [(rec/source {:url "u" :kind :access-control-bypass})]}])]
+    (is (= 4 (:scanned r)))
+    (is (= 1 (count (:accepted r))))
+    (is (= 3 (count (:rejected r))))
+    (is (= #{:no-claim :no-source} (into #{} (comp (map :rejected/reason) (filter keyword?))
+                                         (:rejected r))))))
+
+(deftest an-empty-inbox-is-indeterminate-not-low-seriousness
+  (is (= :indeterminate (:triage (examiner/seriousness {:accepted []}))))
+  (is (= :warrants-collection
+         (:triage (examiner/seriousness {:accepted (good-assertions)})))))
+
+;; ---------------------------------------------------------------------------
+;; Communication — what actually leaves
+;; ---------------------------------------------------------------------------
+
+(deftest the-draft-states-allegation-and-never-guilt
+  (let [c (communication/compose {:situation-id :s :crime :crimes-against-humanity
+                                  :findings (:dossier/findings (good-dossier))
+                                  :assertions (good-assertions)}
+                                 {:at at :hash-fn hash-fn :submitter-did "did:web:openicc.etzhayyim.com"})
+        body (:communication/body c)]
+    (is (str/includes? body "Article 15(2)"))
+    (is (str/includes? body "It is alleged, on the sources cited"))
+    (is (str/includes? body "asserts no finding of guilt"))
+    (is (str/includes? body "assembled by an automated system"))
+    (is (not (str/includes? (str/lower-case body) "is guilty")))
+    (is (some? (:record/cid c)))))
+
+(deftest the-only-dispatch-channel-is-the-prosecutor
+  (let [c (communication/compose {:situation-id :s :crime :war-crimes :findings {} :assertions (good-assertions)}
+                                 {:at at :hash-fn hash-fn})]
+    (is (= :article-15-2-otp (:dispatch/channel (communication/dispatch-request c))))
+    (is (false? (:dispatch/sent? (communication/dispatch-request c))))))
+
+;; ---------------------------------------------------------------------------
+;; End to end
+;; ---------------------------------------------------------------------------
+
+(deftest a-real-situation-runs-end-to-end-and-is-held
+  (testing "the honest outcome for an open-source dossier is a hold, and it must be legible"
+    (let [d (core/build-dossier
+             {:situation-id :example :crime :crimes-against-humanity
+              :trigger :state-referral :territory-state-party? true
+              :conduct-from "2019-04-02" :state-entry-into-force "2003-01-01"
+              :addressed {:attack-on-civilians true}
+              :gravity-factors {:scale :high :nature :high}
+              :raw-items [{:claim "forces attacked X" :sources [(src "reuters" "c1") (src "afp")]
+                           :cites ["7(1)"] :subject-kind :state}]}
+             {:at at :inference-endpoint "murakumo-main"})
+          d (core/run-defence d {})
+          s (core/status d)]
+      (is (= 1 (:assertions s)))
+      (is (= 0 (:named s)))
+      (is (not (:admitted? s)))
+      (is (seq (:refusals s)))
+      (is (true? (get-in d [:dossier/rebuttal :ran?])))
+      (testing "the draft is refused too — a document naming people is not composed off a held dossier"
+        (is (false? (:drafted? (core/draft d {:at at :hash-fn hash-fn}))))))))
+
+(deftest the-statute-registry-ships-unverified-and-says-so
+  (is (not-any? statute/verified? statute/crimes))
+  (is (= 4 (count statute/crimes)))
+  (is (= #{:genocide :crimes-against-humanity :war-crimes :aggression} statute/crime-ids))
+  (is (some? (statute/by-article-ref "17(2)(a)")))
+  (is (nil? (statute/by-article-ref "99(9)"))
+      "a citation the registry does not carry must not resolve")
+  (is (= ["7(1)"] (statute/unverified-citations ["7(1)"]))))

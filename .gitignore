@@ -1,0 +1,7 @@
+.cljs_node_repl/
+.cpcache/
+target/
+node_modules/
+.openicc/
+identity.edn
+*.log

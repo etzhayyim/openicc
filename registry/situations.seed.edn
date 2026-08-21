@@ -1,0 +1,85 @@
+;; openicc — ICC situations, seeded from the public record.
+;;
+;; EVERY entry here is :unverified-seed and NONE of it is publishable. Gate G2
+;; refuses a finding that cites an unverified registry entry, and this file is
+;; the reason that gate exists rather than being a formality: the figures below
+;; came from secondary sources, one of which (the UNIC Japan page the owner
+;; pointed at) is dated to 2016 and states 124 States Parties and 10 situations,
+;; both of which have moved since.
+;;
+;; What a seed is for: it gives the examiner bot something to reconcile AGAINST.
+;; Verification is `openicc.statute/verified?` flipping after a run has compared
+;; an entry to icc-cpi.int. Nothing here may promote itself.
+;;
+;; Note on what these rows are. A situation is not an accusation. The ICC's own
+;; framing is that a SITUATION is a set of circumstances the Prosecutor may
+;; examine; individual criminal responsibility is a separate question decided
+;; case by case, and openicc's own output never states it (gate G13).
+;;
+;; sources
+;;   https://www.unic.or.jp/activities/international_law/icc/   (requesting source, stale)
+;;   https://en.wikipedia.org/wiki/International_Criminal_Court_investigations
+;;   https://legal.un.org/icc/statute/99_corr/cstatute.htm      (Statute text)
+;; retrieved 2026-08-21
+
+{:registry/id      :icc-situations
+ :registry/status  :unverified-seed
+ :registry/note    "trigger ids resolve in openicc.statute/triggers"
+ :registry/retrieved "2026-08-21"
+
+ :registry/entries
+ [{:situation/id :uganda            :situation/opened "2004-07-29" :situation/trigger :state-referral
+   :situation/referred "2003-12"}
+  {:situation/id :drc               :situation/opened "2004-06-23" :situation/trigger :state-referral
+   :situation/referred "2004-03"}
+  {:situation/id :darfur-sudan      :situation/opened "2005-06-06" :situation/trigger :security-council-referral
+   :situation/instrument "UNSC Resolution 1593 (2005)"
+   :situation/note "13(b) route — Sudan is not a State Party, and Article 12(2) does not apply"}
+  {:situation/id :car-i             :situation/opened "2007-05-22" :situation/trigger :state-referral
+   :situation/referred "2004-12"}
+  {:situation/id :kenya             :situation/opened "2010-03-31" :situation/trigger :proprio-motu
+   :situation/note "first Article 15 authorisation by a Pre-Trial Chamber"}
+  {:situation/id :libya             :situation/opened "2011-03-03" :situation/trigger :security-council-referral
+   :situation/instrument "UNSC Resolution 1970 (2011)"}
+  {:situation/id :cote-divoire      :situation/opened "2011-10-03" :situation/trigger :proprio-motu}
+  {:situation/id :mali              :situation/opened "2013-01-16" :situation/trigger :state-referral
+   :situation/referred "2012-07"}
+  {:situation/id :car-ii            :situation/opened "2014-09-24" :situation/trigger :state-referral
+   :situation/referred "2014-06"}
+  {:situation/id :georgia           :situation/opened "2016-01-27" :situation/trigger :proprio-motu}
+  {:situation/id :burundi           :situation/trigger :proprio-motu
+   :situation/opened :unverified
+   :situation/note "trigger recorded as :proprio-motu in the Court's own summary; the secondary source said state referral and is NOT relied on. UNVERIFIED — reconcile before any use."}
+  {:situation/id :bangladesh-myanmar :situation/trigger :proprio-motu
+   :situation/opened :unverified
+   :situation/note "territorial jurisdiction via Bangladesh (a State Party) for cross-border conduct. UNVERIFIED."}
+  {:situation/id :afghanistan       :situation/trigger :proprio-motu :situation/opened :unverified}
+  {:situation/id :palestine         :situation/opened "2021-03-03" :situation/trigger :state-referral
+   :situation/note "opened following a State Party referral; the secondary source said proprio motu and is NOT relied on. UNVERIFIED."}
+  {:situation/id :venezuela-i       :situation/opened "2021-11-04" :situation/trigger :state-referral
+   :situation/note "referred by a group of States Parties. UNVERIFIED."}
+  {:situation/id :philippines       :situation/trigger :proprio-motu :situation/opened :unverified
+   :situation/note "the Philippines withdrew from the Statute in 2019; jurisdiction over conduct during membership survives under Article 127(2). UNVERIFIED."}
+  {:situation/id :ukraine           :situation/trigger :state-referral :situation/opened :unverified
+   :situation/note "referred by a large group of States Parties; Ukraine had lodged Article 12(3) declarations. UNVERIFIED."}
+  {:situation/id :nigeria           :situation/phase :preliminary-examination :situation/opened :unverified}]
+
+ ;; Closed preliminary examinations. Recorded because their ABSENCE from the
+ ;; open list is otherwise indistinguishable from never having been examined,
+ ;; and a bot that cannot tell those apart will re-file what was already
+ ;; declined — Article 15(6) allows resubmission on new facts, not on the same
+ ;; facts a second time.
+ :registry/closed-preliminary-examinations
+ [:bolivia :colombia :congo-ii :gabon :guinea :honduras :iraq-uk
+  :comoros-registered-vessels :greece-registered-vessels
+  :cambodia-registered-vessels :south-korea :venezuela-ii]
+
+ ;; Figures the UNIC page states, kept ONLY as a record of what the requesting
+ ;; source said. Both are stale and neither may be cited.
+ :registry/unic-2016-figures
+ {:states-parties 124
+  :situations-under-investigation 10
+  :cases 23
+  :judges 18
+  :as-of "2016-11"
+  :status :stale-do-not-cite}}

@@ -1,0 +1,35 @@
+;; openicc — the analytic core is dependency-free on purpose.
+;;
+;; `src/` requires nothing but the language. That is not minimalism for its own
+;; sake: it is what lets the whole pipeline run under nbb and, later, under the
+;; Kotoba/WASM guest, which is the runtime order CLAUDE.md sets. A consensus
+;; dependency on the default classpath would pin this library to the JVM and
+;; make the test suite need a network.
+;;
+;; The consensus plane is a PROVIDER, enabled explicitly:
+;;
+;;   clojure -M:inga ...        the inga-backed quorum
+;;   nbb run_tests.cljs         the core suite, no deps, no network
+;;
+;; Reference rule (manifest/layers.edn): workspace-internal deps are
+;; :local/root relative, and the version authority is the west pin.
+{:paths ["src"]
+
+ :aliases
+ {;; The only alias that reaches a consensus implementation. Exactly one
+  ;; namespace lives behind it (openicc.chain.inga) — a second quorum
+  ;; implementation would be a second answer to the question the consensus
+  ;; plane exists to answer.
+  ;;   clojure -M:inga:test -d test -d test-inga
+  :inga {:extra-paths ["src-inga" "test-inga"]
+         :extra-deps {io.github.kotoba-lang/inga
+                      {:local/root "../../kotoba-lang/inga"}}}
+
+  :test {:extra-paths ["test"]
+         :extra-deps {io.github.cognitect-labs/test-runner
+                      {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+         :main-opts ["-m" "cognitect.test-runner"]}
+
+  :lint {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2024.11.14"}}
+         :main-opts    ["-m" "clj-kondo.main" "--lint" "src" "src-inga" "test"
+                        "--fail-level" "error"]}}}

@@ -1,0 +1,71 @@
+(ns openicc.chain-inga-test
+  "The adapter's own suite. Separate from the core suite on purpose: the core
+  suite must keep running with no dependencies and no network, and this one
+  needs the real `inga` on the classpath.
+
+      clojure -M:inga:test -d test -d test-inga
+
+  What is being checked is not inga — inga tests itself. It is the SEAM: that
+  openicc asks inga the question it means to ask. The two ways to get that
+  wrong are both silent, and both are covered below."
+  (:require [clojure.test :refer [deftest is testing]]
+            [openicc.bot.assembly :as assembly]
+            [openicc.chain :as chain]
+            [openicc.chain.inga :as ci]))
+
+(def members ["n1" "n2" "n3" "n4"])
+
+(deftest the-quorum-is-derived-from-set-size-not-read-as-a-threshold
+  (testing "inga.quorum/->predicate reads a bare integer as a THRESHOLD and
+            for-set-size reads it as n; on the same numeral those differ by one
+            vote. openicc has a membership list, so 4 members must require 3."
+    (let [q (ci/quorum-predicate {:members members})]
+      (is (q #{"n1" "n2" "n3"}))
+      (is (not (q #{"n1" "n2"})))
+      (is (= :head-count (:openicc/profile (meta q))))
+      (is (= 4 (:openicc/members (meta q)))))))
+
+(deftest signers-outside-the-enrolled-membership-do-not-count
+  (testing "counting them would let an unenrolled key contribute to a quorum,
+            which is the property the membership list exists to provide"
+    (let [q (ci/quorum-predicate {:members members})]
+      (is (not (q #{"n1" "n2" "intruder"})))
+      (is (q #{"n1" "n2" "n3" "intruder"})))))
+
+(deftest a-quorum-without-members-is-refused
+  (is (thrown? Exception (ci/quorum-predicate {:members []}))))
+
+(deftest a-stake-weighted-quorum-without-bonds-is-refused
+  (is (thrown? Exception (ci/quorum-predicate {:members members :profile :stake-weighted}))))
+
+(deftest an-unknown-profile-is-refused-rather-than-silently-head-counted
+  (is (thrown? Exception (ci/quorum-predicate {:members members :profile :vibes}))))
+
+(deftest a-nil-profile-falls-back-rather-than-throwing
+  (testing "`context` threads an unset :profile through as nil; `:or` in map
+            destructuring fires only on an ABSENT key, so nil must be handled
+            explicitly. This threw against real inga on 2026-08-22."
+    (is (some? (ci/quorum-predicate {:members members :profile nil})))
+    (is (some? (ci/context {:members members :hash-fn str :node-id "n1"})))))
+
+(deftest context-refuses-an-invalid-plane-configuration-rather-than-degrading
+  (testing "a deployment that silently falls back to a single-vendor ref plane
+            would still pass every other test"
+    (is (thrown? Exception
+                 (ci/context {:members members :hash-fn str :node-id "n1"
+                              :config (assoc-in chain/default-config [:refs :provider] :d1)})))))
+
+(deftest the-seam-carries-through-to-certification
+  (let [ctx (ci/context {:members members :hash-fn str :node-id "n1"})
+        ballots (mapv #(assembly/ballot {:signer % :dossier-cid "cid" :admitted? true})
+                      ["n1" "n2" "n3"])
+        cert (assembly/certify {:dossier-cid "cid" :ballots ballots
+                                :quorum-met? (:quorum-met? ctx)
+                                :node-count (:node-count ctx) :at "2026-08-22"})]
+    (is (:quorum-met? cert))
+    (is (= {:n 4 :f 1 :threshold 3} (:threshold cert)))
+    (testing "two of four does not certify"
+      (is (nil? (:cert (assembly/certify {:dossier-cid "cid"
+                                          :ballots (subvec ballots 0 2)
+                                          :quorum-met? (:quorum-met? ctx)
+                                          :node-count 4 :at "2026-08-22"}))))))) 
