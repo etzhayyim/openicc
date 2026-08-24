@@ -47,4 +47,19 @@
     (js/process.exit 3)))
 
 (check-manifest-matches-charter!)
+
+;; Declared exclusion — openicc.chain-inga-test is NOT run here, on purpose.
+;; That suite tests the seam to the real `inga` consensus provider, so it needs
+;; `src-inga` and the inga checkout on the classpath (the `:inga` alias), and it
+;; asserts refusals with the JVM-only `(is (thrown? Exception ...))` form. This
+;; runner exists to be the dependency-free path; pulling inga onto the nbb
+;; classpath would undo the reason deps.edn gives for its own shape. The suite
+;; is run, on the host it is written for, by:
+;;
+;;   clojure -M:inga:test -d test -d test-inga
+;;
+;; Measured 2026-08-24: that command runs BOTH namespaces — 63 tests containing
+;; 142 assertions, 0 failures, 0 errors. If chain_inga_test.cljc ever drops the
+;; JVM-only assertion forms and inga is qualified under nbb, move it into the
+;; require + run-tests call above instead of widening this comment.
 (t/run-tests 'openicc.core-test)
