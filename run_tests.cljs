@@ -48,18 +48,19 @@
 
 (check-manifest-matches-charter!)
 
-;; Declared exclusion — openicc.chain-inga-test is NOT run here, on purpose.
-;; That suite tests the seam to the real `inga` consensus provider, so it needs
+;; NOT run here: the inga-seam suite at test-inga/openicc/chain_inga_test.clj.
+;; It tests the seam to the real `inga` consensus provider, so it needs
 ;; `src-inga` and the inga checkout on the classpath (the `:inga` alias), and it
-;; asserts refusals with the JVM-only `(is (thrown? Exception ...))` form. This
-;; runner exists to be the dependency-free path; pulling inga onto the nbb
-;; classpath would undo the reason deps.edn gives for its own shape. The suite
-;; is run, on the host it is written for, by:
+;; asserts refusals with the JVM-only `(is (thrown? Exception ...))` form. The
+;; `.clj` extension is the declaration of that: it was `.cljc` until 2026-08-24,
+;; which claimed a portability the file never had. This runner stays the
+;; dependency-free path; the seam suite is run, on the host it is written for,
+;; by:
 ;;
 ;;   clojure -M:inga:test -d test -d test-inga
 ;;
-;; Measured 2026-08-24: that command runs BOTH namespaces — 63 tests containing
-;; 142 assertions, 0 failures, 0 errors. If chain_inga_test.cljc ever drops the
-;; JVM-only assertion forms and inga is qualified under nbb, move it into the
-;; require + run-tests call above instead of widening this comment.
+;; Measured 2026-08-24: that command runs both suites — 63 tests containing
+;; 142 assertions, 0 failures, 0 errors. If the seam suite ever drops the
+;; JVM-only assertion forms and inga is qualified under nbb, make it .cljc
+;; again and name it in the require + run-tests call above.
 (t/run-tests 'openicc.core-test)
