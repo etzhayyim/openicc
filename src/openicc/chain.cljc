@@ -17,7 +17,7 @@
   `validate` applies that test to a configuration rather than to prose, because
   a rule that lives only in a document is a rule that is followed until someone
   is in a hurry."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 (def planes
   {:blocks {:plane/role "the records themselves, addressed by content"

@@ -29,7 +29,7 @@
   that could not measure returns the same value as a check that measured and
   found nothing wrong. Here, `nothing to check` is `:refused` with reason
   `:no-evidence`, and the caller can tell the two apart."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [openicc.record :as rec]
             [openicc.statute :as statute]))
 
@@ -244,9 +244,9 @@
 (defn check-G13 [dossier]
   (let [texts (into [] (comp (mapcat (fn [f] (cons (:finding/rationale f)
                                                    (map :assertion/claim (:finding/assertions f)))))
-                             (map (comp str/lower-case str)))
+                             (map (comp str/lower str)))
                     (vals (:dossier/findings dossier)))
-        hits  (filterv (fn [t] (some #(str/includes? t (str/lower-case %)) guilt-language)) texts)]
+        hits  (filterv (fn [t] (some #(str/includes? t (str/lower %)) guilt-language)) texts)]
     (cond
       (empty? texts) (refusal :G13 :no-evidence {:scanned 0})
       (seq hits)     (refusal :G13 :pronounces-guilt
