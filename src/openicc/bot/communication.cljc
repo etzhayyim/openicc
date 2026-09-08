@@ -18,7 +18,7 @@
   Gate G13 (Article 66, presumption of innocence) is enforced on the text this
   bot writes, so the phrasing below is not stylistic. A communication *requests
   examination of alleged conduct on stated sources*. It does not pronounce."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [openicc.record :as rec]
             [openicc.statute :as statute]))
 

@@ -10,7 +10,7 @@
   it could not fetch produces a dossier that looks thinner than the record and
   gives no way to tell `we looked and found little` from `we could not look`.
   So `intake` returns both the accepted items and the rejected ones, with why."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [openicc.record :as rec]))
 
 (def prohibited-source-kinds

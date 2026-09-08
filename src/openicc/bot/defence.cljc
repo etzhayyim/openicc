@@ -15,7 +15,7 @@
   thin to evaluate. A defence bot that abstains on thin evidence is not neutral;
   it is a rubber stamp with extra steps, because thin evidence is exactly the
   condition under which the other bots are most likely to be wrong."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [openicc.record :as rec]))
 
 (def grounds

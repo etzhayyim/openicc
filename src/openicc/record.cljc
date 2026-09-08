@@ -17,7 +17,7 @@
     an assertion that cites nothing. This is not a lint — in this domain an
     unsourced sentence about a named person is the failure mode, so it is
     unrepresentable rather than discouraged."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 ;; ---------------------------------------------------------------------------
 ;; Canonical form
@@ -95,7 +95,7 @@
   finding publishable is the wrong direction to guess."
   [sources]
   (count (into #{} (map-indexed (fn [i s]
-                                  (or (some-> (:source/publisher s) str/lower-case str/trim not-empty)
+                                  (or (some-> (:source/publisher s) str/lower str/trim not-empty)
                                       [::anonymous i])))
                sources)))
 

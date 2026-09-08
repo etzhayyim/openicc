@@ -16,7 +16,7 @@
   reconciles it against the depositary text at
   https://legal.un.org/icc/statute/99_corr/cstatute.htm. `unverified-seed`
   entries are readable and reasonable-about; they are NOT publishable."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 ;; ---------------------------------------------------------------------------
 ;; Provenance

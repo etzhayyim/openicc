@@ -6,7 +6,7 @@
   same dossier with exactly one thing broken — and the assertion names the gate
   that must fire. Breaking two things and watching something go red proves
   nothing about which check was doing the work."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [clojure.test :refer [deftest is testing]]
             [openicc.bot.admissibility :as admissibility]
             [openicc.bot.assembly :as assembly]
@@ -554,7 +554,7 @@
     (is (str/includes? body "It is alleged, on the sources cited"))
     (is (str/includes? body "asserts no finding of guilt"))
     (is (str/includes? body "assembled by an automated system"))
-    (is (not (str/includes? (str/lower-case body) "is guilty")))
+    (is (not (str/includes? (str/lower body) "is guilty")))
     (is (some? (:record/cid c)))))
 
 (deftest the-only-dispatch-channel-is-the-prosecutor
