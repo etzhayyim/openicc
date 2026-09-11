@@ -9,7 +9,7 @@
 ;; The consensus plane is a PROVIDER, enabled explicitly:
 ;;
 ;;   clojure -M:inga ...        the inga-backed quorum
-;;   nbb run_tests.cljs         the core suite, no deps, no network
+;;   nbb run_tests.cljk         the core suite, no deps, no network
 ;;
 ;; Reference rule (manifest/layers.edn): workspace-internal deps are
 ;; :local/root relative, and the version authority is the west pin.

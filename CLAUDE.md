@@ -48,11 +48,11 @@ openicc はオーナー判断（2026-08-21）で**逆**に振られている: �
 - 新しい production `.clj` を置かない。`.cljc` で書く。
 - host interop（`.indexOf` 等）を `src/` に書かない。同じコードが JVM・nbb・
   Kotoba/WASM guest で走ることが前提（CLAUDE.md のランタイム順序）。
-- `inga` に触れてよいのは `src-inga/openicc/chain/inga.cljc` **だけ**。
+- `inga` に触れてよいのは `src-inga/openicc/chain/inga.cljk` **だけ**。
   合意プレーンの依存が既定 classpath に載った時点で、この library は JVM に固定される。
 
 ```bash
-nbb run_tests.cljs                          # 中核（依存なし）
+nbb run_tests.cljk                          # 中核（依存なし）
 clojure -M:test                             # 同じ .cljc を JVM で
 clojure -M:inga:test -d test -d test-inga   # 実 inga の seam 込み
 ```
