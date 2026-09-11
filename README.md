@@ -126,10 +126,10 @@ lease は ref プレーン＝ inga quorum に対する CAS なので、2 台が�
 ## 使い方
 
 ```bash
-nbb run_tests.cljk                          # 中核スイート（依存なし・ネットワーク不要）
-clojure -M:test                             # 同じ .cljc を JVM で
-clojure -M:inga:test -d test -d test-inga   # 実 inga を通した seam も含めて
-clojure -M:lint
+kbb --backend sci run_tests.cljk                          # 中核スイート（依存なし・ネットワーク不要）
+kbb -M:test                             # 同じ .cljc を JVM で
+kbb -M:inga:test -d test -d test-inga   # 実 inga を通した seam も含めて
+kbb -M:lint
 ```
 
 `src/` は**依存ゼロ**です。禁欲ではなく、CLAUDE.md のランタイム順序
