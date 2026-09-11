@@ -8,8 +8,8 @@
 ;;
 ;; The consensus plane is a PROVIDER, enabled explicitly:
 ;;
-;;   clojure -M:inga ...        the inga-backed quorum
-;;   nbb run_tests.cljk         the core suite, no deps, no network
+;;   kbb -M:inga ...        the inga-backed quorum
+;;   kbb --backend sci run_tests.cljk         the core suite, no deps, no network
 ;;
 ;; Reference rule (manifest/layers.edn): workspace-internal deps are
 ;; :local/root relative, and the version authority is the west pin.
@@ -25,7 +25,7 @@
   ;; namespace lives behind it (openicc.chain.inga) — a second quorum
   ;; implementation would be a second answer to the question the consensus
   ;; plane exists to answer.
-  ;;   clojure -M:inga:test -d test -d test-inga
+  ;;   kbb -M:inga:test -d test -d test-inga
   :inga {:extra-paths ["src-inga" "test-inga"]
          :extra-deps {io.github.kotoba-lang/inga
                       {:local/root "../../kotoba-lang/inga"}}}

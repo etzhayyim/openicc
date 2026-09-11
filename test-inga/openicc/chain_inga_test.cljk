@@ -3,7 +3,7 @@
   suite must keep running with no dependencies and no network, and this one
   needs the real `inga` on the classpath.
 
-      clojure -M:inga:test -d test -d test-inga
+      kbb -M:inga:test -d test -d test-inga
 
   What is being checked is not inga — inga tests itself. It is the SEAM: that
   openicc asks inga the question it means to ask. The two ways to get that

@@ -52,9 +52,9 @@ openicc はオーナー判断（2026-08-21）で**逆**に振られている: �
   合意プレーンの依存が既定 classpath に載った時点で、この library は JVM に固定される。
 
 ```bash
-nbb run_tests.cljk                          # 中核（依存なし）
-clojure -M:test                             # 同じ .cljc を JVM で
-clojure -M:inga:test -d test -d test-inga   # 実 inga の seam 込み
+kbb --backend sci run_tests.cljk                          # 中核（依存なし）
+kbb -M:test                             # 同じ .cljc を JVM で
+kbb -M:inga:test -d test -d test-inga   # 実 inga の seam 込み
 ```
 
 **両方走らせること。** 2026-08-22、テスト内の無意味な式を nbb は素通しし JVM だけが
@@ -80,7 +80,7 @@ arity エラーで捕まえた。片方のランタイムでしか走ってい�
 
 ゲート数・bot 数・テスト件数・締約国数・事態数を、この CLAUDE.md や README の散文に
 定数として書き足さない。書けば引用され、引用する側は日付を落とす。
-**引き方を書く**（`gov/gates` を数える、`clojure -M:test` を走らせる）。
+**引き方を書く**（`gov/gates` を数える、`kbb -M:test` を走らせる）。
 既に書いてある数値は landing 時点の実測で、疑わしければ測り直す。
 
 ## 送信について
