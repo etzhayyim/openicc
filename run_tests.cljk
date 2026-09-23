@@ -11,7 +11,7 @@
 ;; runtime.
 (ns run-tests
   (:require ["fs" :as fs]
-            [clojure.edn :as edn]
+            [kotoba.lang.edn :as edn]
             [kotoba.test :as t]
             [openicc.core-test]
             [openicc.governor :as gov]))
