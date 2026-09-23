@@ -8,7 +8,7 @@
   What is being checked is not inga — inga tests itself. It is the SEAM: that
   openicc asks inga the question it means to ask. The two ways to get that
   wrong are both silent, and both are covered below."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [openicc.bot.assembly :as assembly]
             [openicc.chain :as chain]
             [openicc.chain.inga :as ci]))

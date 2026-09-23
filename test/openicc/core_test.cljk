@@ -7,7 +7,7 @@
   that must fire. Breaking two things and watching something go red proves
   nothing about which check was doing the work."
   (:require [kotoba.lang.text :as str]
-            [clojure.test :refer [deftest is testing]]
+            [kotoba.test :refer [deftest is testing]]
             [openicc.bot.admissibility :as admissibility]
             [openicc.bot.assembly :as assembly]
             [openicc.bot.communication :as communication]

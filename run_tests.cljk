@@ -12,7 +12,7 @@
 (ns run-tests
   (:require ["fs" :as fs]
             [clojure.edn :as edn]
-            [clojure.test :as t]
+            [kotoba.test :as t]
             [openicc.core-test]
             [openicc.governor :as gov]))
 
