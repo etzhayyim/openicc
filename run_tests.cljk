@@ -1,5 +1,5 @@
 #!/usr/bin/env kbb
-;; The primary test path. nbb, not the JVM — CLAUDE.md's runtime order is
+;; The primary test path. nbb, not the JVM — AGENTS.md's runtime order is
 ;; kotoba wasm > clojurewasm > ClojureScript > nbb > (JVM, bb), and everything
 ;; under src/ is portable .cljc with no dependencies, so there is nothing here
 ;; that needs a JVM.

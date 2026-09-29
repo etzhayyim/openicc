@@ -2,7 +2,7 @@
 ;;
 ;; `src/` requires nothing but the language. That is not minimalism for its own
 ;; sake: it is what lets the whole pipeline run under nbb and, later, under the
-;; Kotoba/WASM guest, which is the runtime order CLAUDE.md sets. A consensus
+;; Kotoba/WASM guest, which is the runtime order AGENTS.md sets. A consensus
 ;; dependency on the default classpath would pin this library to the JVM and
 ;; make the test suite need a network.
 ;;
