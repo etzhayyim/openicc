@@ -34,7 +34,7 @@
 (defn next-phase
   "The phase after `phase`, or nil at the end. Written as a fold over `phases`
   rather than host interop so the same code runs on the JVM, on ClojureScript
-  and in the Kotoba/WASM guest — the runtime priority in CLAUDE.md is not a
+  and in the Kotoba/WASM guest — the runtime priority in AGENTS.md is not a
   preference, and `.indexOf` would have quietly pinned this namespace to one
   host."
   [phase]

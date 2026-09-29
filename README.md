@@ -132,7 +132,7 @@ kbb -M:inga:test -d test -d test-inga   # 実 inga を通した seam も含め�
 kbb -M:lint
 ```
 
-`src/` は**依存ゼロ**です。禁欲ではなく、CLAUDE.md のランタイム順序
+`src/` は**依存ゼロ**です。禁欲ではなく、AGENTS.md のランタイム順序
 （kotoba wasm > clojurewasm > ClojureScript > nbb > JVM）に従うためです。
 既定 classpath に合意プレーンの依存があると、この library は JVM に固定され、
 テストにネットワークが要るようになります。`inga` に触れる namespace は
@@ -158,7 +158,7 @@ kbb -M:lint
   end-to-end テストはまさにそれを固定しています。次の一手は「送る」ことではなく
   **registry を検証すること**です。
 - **`.kotoba` 化は未着手。** `jurisdiction` と `admissibility` と `elements` は
-  純粋な決定核（decision core）で、CLAUDE.md が `.kotoba` に切り出せと言っている
+  純粋な決定核（decision core）で、AGENTS.md が `.kotoba` に切り出せと言っている
   形そのものですが、今は `.cljc` です。境界は既に引いてあります — collection の
   組み立てと effect は外、判断だけが中。
 - **live 稼働なし。** lease も、実ノードも、実 anchor も配備していません。

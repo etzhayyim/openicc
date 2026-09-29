@@ -43,7 +43,7 @@
   `situation` carries the facts the examiner established plus the jurisdictional
   and complementarity inputs. `ctx` carries `:at`, `:hash-fn` and
   `:inference-endpoint` (which must resolve through the murakumo-main alias —
-  see CLAUDE.md; a concrete model id here would be stale within weeks).
+  see AGENTS.md; a concrete model id here would be stale within weeks).
 
   Returns a dossier ready for `defence/refute` and then the governor. The
   rebuttal slot is filled with `defence/not-run`, which is a REFUSAL state, so a

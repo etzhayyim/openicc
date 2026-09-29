@@ -1,4 +1,4 @@
-# CLAUDE.md — openicc
+# AGENTS.md — openicc
 
 このリポジトリで作業する agent への契約。**README を先に読むこと。**
 
@@ -47,7 +47,7 @@ openicc はオーナー判断（2026-08-21）で**逆**に振られている: �
   （ADR-2608170200 / PreToolUse `jvm-new-surface-guard`）。
 - 新しい production `.clj` を置かない。`.cljc` で書く。
 - host interop（`.indexOf` 等）を `src/` に書かない。同じコードが JVM・nbb・
-  Kotoba/WASM guest で走ることが前提（CLAUDE.md のランタイム順序）。
+  Kotoba/WASM guest で走ることが前提（AGENTS.md のランタイム順序）。
 - `inga` に触れてよいのは `src-inga/openicc/chain/inga.cljk` **だけ**。
   合意プレーンの依存が既定 classpath に載った時点で、この library は JVM に固定される。
 
@@ -78,7 +78,7 @@ arity エラーで捕まえた。片方のランタイムでしか走ってい�
 
 ## 数値をこのファイルに書かない
 
-ゲート数・bot 数・テスト件数・締約国数・事態数を、この CLAUDE.md や README の散文に
+ゲート数・bot 数・テスト件数・締約国数・事態数を、この AGENTS.md や README の散文に
 定数として書き足さない。書けば引用され、引用する側は日付を落とす。
 **引き方を書く**（`gov/gates` を数える、`kbb -M:test` を走らせる）。
 既に書いてある数値は landing 時点の実測で、疑わしければ測り直す。
